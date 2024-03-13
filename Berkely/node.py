@@ -4,11 +4,11 @@ import sys
 import time 
 import threading
 
-
+barrier = threading.Barrier(6)
 class Node:
     def __init__(self, port,status):
         self.port = port
-        
+        self.threads=[]
         self.status = status
         if self.status=="server":
             self.server = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
@@ -49,7 +49,7 @@ class Node:
 
         print("Server is listening on : ",self.port)
 
-        while True:
+        while count[0]<6:
             # Wait for a connection
             print("Waiting for a connection...")
             connection, client_address = self.server.accept()
@@ -64,18 +64,23 @@ class Node:
                         break
                     #make a new connection specially for this request
                     reqServer = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-                    count[0]=count[0]+1
+                    
                     print("the value of count is :",count)
                     # Bind the socket to the address and let the OS choose an available port
                     reqServer.bind(('localhost', 0))
                     _, port = reqServer.getsockname()
                     print("Available port number:", port)
-                    server_thread = threading.Thread(target=self.handleReq,args=(reqServer,count,count[0]))
+                    currentuser=count[0]+1
+                    server_thread = threading.Thread(target=self.handleReq,args=(reqServer,count,currentuser,))
+                    self.threads.append(server_thread)
                     server_thread.start()          
                     port=str(port)
-                    # Echo back the data
+                 
                     connection.sendall(port.encode())
-                    #create a thread to handle request for this specific port for specific user
+                    #this time is to syncronise the thread together so that both run the function together
+                    time.sleep(3)
+                    count[0]=currentuser
+                    
                     
                     
                    
@@ -86,25 +91,32 @@ class Node:
                 # Clean up the connection
                 print(count)
                 connection.close()
+        #so that it waits for all the threads to complete
+        for thread in self.threads:
+            thread.join()
+
+        print("value of count : ",count)
     def handleReq(self,server,count,num):
         server.listen(5)
         connection, client_address = server.accept()
-        print("second server client",client_address)
+        print("Connection Number is :", num)
         try:
             # Receive the data from the client
             while True:
                 data = connection.recv(1024)
                 
-                if count[0]>1:
+                if not data:
                     break
                 message='send Time' 
-                while count[0]<=1:
+                while count[0]<=5:
+                
                     continue
-                print("here")
+                barrier.wait()
                 connection.sendall(message.encode())
                 data = connection.recv(1024)
                 print('time : ',data.decode())
                 count[num]=float(data.decode())
+                print('this is true count:',count)
                 
         except:
             print("in exception")
